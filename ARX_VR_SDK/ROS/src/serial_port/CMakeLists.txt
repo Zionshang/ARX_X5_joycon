@@ -12,6 +12,13 @@ find_package(catkin REQUIRED COMPONENTS
   serial
 )
 
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+    message(STATUS "Target architecture is ARM")
+    set(DEPEND_LIB ${CMAKE_CURRENT_SOURCE_DIR}/lib/vr_serial/arm64/libvr_serial.so)
+else ()
+    set(DEPEND_LIB ${CMAKE_CURRENT_SOURCE_DIR}/lib/vr_serial/x86/libvr_serial.so)
+endif ()
+
 catkin_package(
  INCLUDE_DIRS include
  LIBRARIES serial_port
@@ -31,7 +38,7 @@ link_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib)
 
 add_executable(${PROJECT_NAME} src/serial_port.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC lib/vr_serial/include)
-target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${CMAKE_CURRENT_SOURCE_DIR}/lib/vr_serial/libvr_serial.so)
+target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${DEPEND_LIB})
 
 add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
@@ -40,7 +47,7 @@ install(TARGETS
   DESTINATION lib/${PROJECT_NAME}
 )
 
-install(FILES lib/vr_serial/libvr_serial.so
+install(FILES ${DEPEND_LIB}
   DESTINATION lib/
 )
 
