@@ -37,7 +37,7 @@ namespace arx::x5
         void setCatch(double position);
 
         void setCatchTorque(double torque);
-
+        void arx_x(double arx1, double arx2, double arx3);
         /// @brief 状态枚举
         enum state
         {

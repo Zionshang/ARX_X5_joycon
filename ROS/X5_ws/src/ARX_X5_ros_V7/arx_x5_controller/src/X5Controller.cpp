@@ -33,7 +33,7 @@ X5Controller::X5Controller(ros::NodeHandle nh) {
     urdf_path = package_path + "/x5_master.urdf";
   interfaces_ptr_ = std::make_shared<InterfacesThread>(
       urdf_path, nh.param("arm_can_id", std::string("can0")), arm_end_type_);
-
+  interfaces_ptr_->arx_x(500, 2000, 10);
   if (arm_control_type == "normal_v1") {
     ROS_INFO("常规模式启动[v1]");
     // sub

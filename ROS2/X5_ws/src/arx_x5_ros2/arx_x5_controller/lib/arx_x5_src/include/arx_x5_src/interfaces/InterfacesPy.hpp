@@ -41,6 +41,7 @@ namespace arx::x5
         /// @brief 获取末端位姿xyzrpy
         /// @return xyzrpy组成的6维vector
         std::vector<double> get_ee_pose_xyzrpy();
+        void arx_x(double arx1, double arx2, double arx3);
 
     private:
         class impl;

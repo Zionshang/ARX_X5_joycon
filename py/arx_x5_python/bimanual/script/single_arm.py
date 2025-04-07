@@ -90,6 +90,7 @@ class SingleArm:
         else:
             urdf_path = os.path.join(current_dir,"x5_master.urdf")
         self.arm = arx.InterfacesPy(urdf_path,config.get("can_port", "can0"),type)
+        self.arm.arx_x(500,2000,10)
 
     def get_joint_names(self) -> List[str]:
         """
