@@ -31,8 +31,9 @@ X5Controller::X5Controller(ros::NodeHandle nh) {
     urdf_path = package_path + "/x5.urdf";
   else
     urdf_path = package_path + "/x5_master.urdf";
-  interfaces_ptr_ = std::make_shared<InterfacesThread>(
-      urdf_path, nh.param("arm_can_id", std::string("can0")), arm_end_type_);
+  can_name_ = nh.param("arm_can_id", std::string("can0"));
+  interfaces_ptr_ =
+      std::make_shared<InterfacesThread>(urdf_path, can_name_, arm_end_type_);
   interfaces_ptr_->arx_x(500, 2000, 10);
   if (arm_control_type == "normal_v1") {
     ROS_INFO("常规模式启动[v1]");
@@ -206,7 +207,33 @@ void X5Controller::PubState(const ros::TimerEvent &) {
   std::vector<double> joint_current_vector = interfaces_ptr_->getJointCurrent();
 
   // 发布消息
-  ROS_INFO("Publishing RobotStatus message");
+  ROS_INFO("joint_pos:%f,%f,%f,%f,%f,%f,%f", joint_pos_vector[0],
+           joint_pos_vector[1], joint_pos_vector[2], joint_pos_vector[3],
+           joint_pos_vector[4], joint_pos_vector[5], joint_pos_vector[6]);
+  ROS_INFO("joint_vel:%f,%f,%f,%f,%f,%f,%f", joint_velocities_vector[0],
+           joint_velocities_vector[1], joint_velocities_vector[2],
+           joint_velocities_vector[3], joint_velocities_vector[4],
+           joint_velocities_vector[5], joint_velocities_vector[6]);
+  ROS_INFO("joint_cur:%f,%f,%f,%f,%f,%f,%f", joint_current_vector[0],
+           joint_current_vector[1], joint_current_vector[2],
+           joint_current_vector[3], joint_current_vector[4],
+           joint_current_vector[5], joint_current_vector[6]);
+  setlocale(LC_ALL, "");
+  for (int code : interfaces_ptr_->getErrorCode()) {
+    if (code == 1)
+      ROS_ERROR("关节力矩超限");
+    else if (code == 2)
+      ROS_ERROR("%s掉线", can_name_.c_str());
+    else if (code > 10) {
+      int joint_id = code / 16;
+      int error_code = code % 16;
+      if (error_code == 15)
+        ROS_ERROR("电机离线！离线电机编号：%d", joint_id);
+      else
+        ROS_ERROR("电机返回故障，电机编号：%d,故障类型：%X", joint_id,
+                  error_code);
+    }
+  }
 
   if (pub_topic_v1_) {
     pubArmStatusV1(joint_pos_vector, joint_velocities_vector,
