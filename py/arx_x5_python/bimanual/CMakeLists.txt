@@ -22,7 +22,11 @@ target_link_libraries(${PROJECT_NAME} PUBLIC ${DEPEND_LIB} pybind11::module)
 set(CMAKE_INSTALL_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/api/" CACHE PATH "Installation Directory" FORCE)
 
 install(DIRECTORY lib/ DESTINATION ./)
-
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/lib/arx_x5_src/libarx_x5_src-arm64.so
+    	    DESTINATION ./arx_x5_src
+    	    RENAME libarx_x5_src.so)
+endif()
 install(TARGETS ${PROJECT_NAME}
         LIBRARY DESTINATION ./${PROJECT_NAME}/
         ARCHIVE DESTINATION ./${PROJECT_NAME}/)

@@ -8,6 +8,7 @@
 #include "arm_control/JointControl.h"
 #include "arm_control/JointInformation.h"
 #include "arm_control/PosCmd.h"
+#include <std_msgs/Int32MultiArray.h>
 
 #include <chrono>
 #include <memory>
@@ -26,7 +27,7 @@ public:
   void FollowCallbackV2(const arx5_arm_msg::RobotStatus::ConstPtr &msg);
 
   void JointControlCallbackV1(const arm_control::JointControl::ConstPtr &msg);
-
+  void arxJoyCB(const std_msgs::Int32MultiArray::ConstPtr &msg);
   // pub
   void PubState(const ros::TimerEvent &);
   // 发布old_joint_state_publisher_和old_ee_pos_publisher_信息
@@ -50,6 +51,8 @@ private:
 
   ros::Publisher joint_state_publisher_;
   ros::Subscriber joint_state_subscriber_;
+  ros::Subscriber arx_joy_sub_;
+  std::vector<double> go_home_positions = {0, 0, 0, 0, 0, 0};
 
   ros::Publisher joint_state_publisher_v1_;
   ros::Publisher ee_pos_publisher_v1_;

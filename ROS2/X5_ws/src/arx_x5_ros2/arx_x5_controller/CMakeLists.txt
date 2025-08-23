@@ -22,7 +22,7 @@ endif ()
 add_executable(X5Controller src/X5Controller.cpp)
 target_include_directories(X5Controller PUBLIC lib/arx_hardware_interface/include lib/arx_x5_src/include)
 target_link_libraries(X5Controller ${DEPEND_LIB})
-ament_target_dependencies(X5Controller rclcpp std_msgs arx5_arm_msg arm_control ament_index_cpp)
+ament_target_dependencies(X5Controller rclcpp ament_index_cpp std_msgs arx5_arm_msg arm_control)
 
 add_executable(KeyBoard src/KeyBoard.cpp)
 ament_target_dependencies(KeyBoard rclcpp std_msgs arx5_arm_msg)
@@ -49,6 +49,10 @@ install(FILES x5.urdf
 )
 
 install(FILES x5_master.urdf
+        DESTINATION share/${PROJECT_NAME}
+)
+
+install(FILES x5_2025.urdf
         DESTINATION share/${PROJECT_NAME}
 )
 

@@ -8,7 +8,7 @@
 
 namespace arx::x5 {
 X5Controller::X5Controller(ros::NodeHandle nh) {
-  ROS_INFO("机械臂开始初始化...");
+  ROS_INFO("[%s] 机械臂开始初始化...", ros::this_node::getName().c_str());
   std::string arm_control_type =
       nh.param("arm_control_type", std::string("normal_v2"));
 
@@ -24,19 +24,23 @@ X5Controller::X5Controller(ros::NodeHandle nh) {
       static_cast<CatchControlMode>(nh.param("catch_control_mode", 0));
 
   arm_end_type_ = nh.param("arm_end_type", 0);
+  nh.getParam("go_home_position", go_home_positions);
 
   std::string package_path = ros::package::getPath("arx_x5_controller");
   std::string urdf_path;
   if (arm_end_type_ == 0)
     urdf_path = package_path + "/x5.urdf";
-  else
+  else if (arm_end_type_ == 1)
     urdf_path = package_path + "/x5_master.urdf";
+  else
+    urdf_path = package_path + "/x5_2025.urdf";
   can_name_ = nh.param("arm_can_id", std::string("can0"));
   interfaces_ptr_ =
       std::make_shared<InterfacesThread>(urdf_path, can_name_, arm_end_type_);
   interfaces_ptr_->arx_x(500, 2000, 10);
+  interfaces_ptr_->setHomePositions(go_home_positions);
   if (arm_control_type == "normal_v1") {
-    ROS_INFO("常规模式启动[v1]");
+    ROS_INFO("[%s] 常规模式启动[v1]", ros::this_node::getName().c_str());
     // sub
     joint_state_subscriber_ = nh.subscribe<arm_control::PosCmd>(
         sub_topic_name, 10, &X5Controller::CmdCallbackV1, this);
@@ -49,7 +53,7 @@ X5Controller::X5Controller(ros::NodeHandle nh) {
     pub_topic_v1_ = true;
     pub_topic_v2_ = false;
   } else if (arm_control_type == "normal_v2") {
-    ROS_INFO("常规模式启动[v2]");
+    ROS_INFO("[%s] 常规模式启动[v2]", ros::this_node::getName().c_str());
     // sub
     joint_state_subscriber_ = nh.subscribe<arx5_arm_msg::RobotCmd>(
         sub_topic_name, 10, &X5Controller::CmdCallbackV2, this);
@@ -59,7 +63,7 @@ X5Controller::X5Controller(ros::NodeHandle nh) {
     pub_topic_v1_ = false;
     pub_topic_v2_ = true;
   } else if (arm_control_type == "vr_slave_v1") {
-    ROS_INFO("vr_slave启动[v1]");
+    ROS_INFO("[%s] vr_slave启动[v1]", ros::this_node::getName().c_str());
     // sub
     joint_state_subscriber_ = nh.subscribe<arm_control::JointInformation>(
         sub_topic_name, 10, &X5Controller::FollowCallbackV1, this);
@@ -72,7 +76,7 @@ X5Controller::X5Controller(ros::NodeHandle nh) {
     pub_topic_v1_ = true;
     pub_topic_v2_ = false;
   } else if (arm_control_type == "remote_master_v1") {
-    ROS_INFO("remote_master启动[v1]");
+    ROS_INFO("[%s] remote_master启动[v1]", ros::this_node::getName().c_str());
     interfaces_ptr_->setArmStatus(InterfacesThread::state::G_COMPENSATION);
     // pub
     ee_pos_publisher_v1_ =
@@ -82,7 +86,7 @@ X5Controller::X5Controller(ros::NodeHandle nh) {
     pub_topic_v1_ = true;
     pub_topic_v2_ = false;
   } else if (arm_control_type == "remote_slave_v1") {
-    ROS_INFO("remote_slave启动[v1]");
+    ROS_INFO("[%s] remote_slave启动[v1]", ros::this_node::getName().c_str());
     // sub
     joint_state_subscriber_ = nh.subscribe<arm_control::JointInformation>(
         sub_topic_name, 10, &X5Controller::FollowCallbackV1, this);
@@ -95,7 +99,7 @@ X5Controller::X5Controller(ros::NodeHandle nh) {
     pub_topic_v1_ = true;
     pub_topic_v2_ = false;
   } else if (arm_control_type == "joint_control_v1") {
-    ROS_INFO("常规模式启动[v1]");
+    ROS_INFO("[%s] 常规模式启动[v1]", ros::this_node::getName().c_str());
     // sub
     joint_state_subscriber_ = nh.subscribe<arm_control::JointControl>(
         sub_topic_name, 10, &X5Controller::JointControlCallbackV1, this);
@@ -108,6 +112,8 @@ X5Controller::X5Controller(ros::NodeHandle nh) {
     pub_topic_v1_ = true;
     pub_topic_v2_ = false;
   }
+  arx_joy_sub_ = nh.subscribe<std_msgs::Int32MultiArray>(
+      "/arx_joy", 1, &X5Controller::arxJoyCB, this);
 
   timer_ = nh.createTimer(ros::Duration(0.01), &X5Controller::PubState, this);
 }
@@ -142,7 +148,10 @@ void X5Controller::CmdCallbackV1(const arm_control::PosCmd::ConstPtr &msg) {
   Eigen::Isometry3d transform = solve::Xyzrpy2Isometry(input);
   interfaces_ptr_->setEndPose(transform);
   interfaces_ptr_->setArmStatus(InterfacesThread::state::END_CONTROL);
-  interfaces_ptr_->setCatch(msg->gripper);
+  double gripper = msg->gripper;
+  if(arm_end_type_ == 2)
+    gripper *= (-3.4 / 5);
+  interfaces_ptr_->setCatch(gripper);
 }
 
 void X5Controller::FollowCallbackV2(
@@ -190,6 +199,14 @@ void X5Controller::JointControlCallbackV1(
   interfaces_ptr_->setCatch(msg->joint_pos[6]);
 }
 
+void X5Controller::arxJoyCB(const std_msgs::Int32MultiArray::ConstPtr &msg) {
+  if (msg->data[0] == 1)
+    interfaces_ptr_->setArmStatus(InterfacesThread::state::G_COMPENSATION);
+  if (msg->data[1] == 1) {
+    interfaces_ptr_->setArmStatus(InterfacesThread::state::GO_HOME);
+  }
+}
+
 // Publisher
 void X5Controller::PubState(const ros::TimerEvent &) {
 
@@ -207,30 +224,30 @@ void X5Controller::PubState(const ros::TimerEvent &) {
   std::vector<double> joint_current_vector = interfaces_ptr_->getJointCurrent();
 
   // 发布消息
-  ROS_INFO("joint_pos:%f,%f,%f,%f,%f,%f,%f", joint_pos_vector[0],
+  ROS_INFO("[%s] joint_pos:%f,%f,%f,%f,%f,%f,%f", ros::this_node::getName().c_str(), joint_pos_vector[0],
            joint_pos_vector[1], joint_pos_vector[2], joint_pos_vector[3],
            joint_pos_vector[4], joint_pos_vector[5], joint_pos_vector[6]);
-  ROS_INFO("joint_vel:%f,%f,%f,%f,%f,%f,%f", joint_velocities_vector[0],
+  ROS_INFO("[%s] joint_vel:%f,%f,%f,%f,%f,%f,%f", ros::this_node::getName().c_str(), joint_velocities_vector[0],
            joint_velocities_vector[1], joint_velocities_vector[2],
            joint_velocities_vector[3], joint_velocities_vector[4],
            joint_velocities_vector[5], joint_velocities_vector[6]);
-  ROS_INFO("joint_cur:%f,%f,%f,%f,%f,%f,%f", joint_current_vector[0],
+  ROS_INFO("[%s] joint_cur:%f,%f,%f,%f,%f,%f,%f", ros::this_node::getName().c_str(), joint_current_vector[0],
            joint_current_vector[1], joint_current_vector[2],
            joint_current_vector[3], joint_current_vector[4],
            joint_current_vector[5], joint_current_vector[6]);
   setlocale(LC_ALL, "");
   for (int code : interfaces_ptr_->getErrorCode()) {
     if (code == 1)
-      ROS_ERROR("关节力矩超限");
+      ROS_ERROR("[%s] 关节力矩超限", ros::this_node::getName().c_str());
     else if (code == 2)
-      ROS_ERROR("%s掉线", can_name_.c_str());
+      ROS_ERROR("[%s] %s掉线", ros::this_node::getName().c_str(), can_name_.c_str());
     else if (code > 10) {
       int joint_id = code / 16;
       int error_code = code % 16;
       if (error_code == 15)
-        ROS_ERROR("电机离线！离线电机编号：%d", joint_id);
+        ROS_ERROR("[%s] 电机离线！离线电机编号：%d", ros::this_node::getName().c_str(), joint_id);
       else
-        ROS_ERROR("电机返回故障，电机编号：%d,故障类型：%X", joint_id,
+        ROS_ERROR("[%s] 电机返回故障，电机编号：%d,故障类型：%X", ros::this_node::getName().c_str(), joint_id,
                   error_code);
     }
   }

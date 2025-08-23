@@ -13,16 +13,21 @@ X5Controller::X5Controller() : Node("x5_controller_node") {
   std::string package_share_dir = ament_index_cpp::get_package_share_directory(package_name);
   int end_type = this->declare_parameter("arm_end_type", 0);
   catch_control_mode_ = static_cast<CatchControlMode>(this->declare_parameter("catch_control_mode", 0));
+  go_home_positions_ = this->declare_parameter<std::vector<double>>("go_home_position",std::vector<double>{0,0,0,0,0,0});
   std::string urdf_path;
   if (end_type == 0)
     urdf_path = package_share_dir + "/" + "x5.urdf";
-  else
+  else if (end_type == 1)
     urdf_path = package_share_dir + "/" + "x5_master.urdf";
-
+  else {
+    urdf_path = package_share_dir + "/x5_2025.urdf";
+    new_version_ = true;
+  }
   interfaces_ptr_ =
       std::make_shared<InterfacesThread>(urdf_path, this->declare_parameter("arm_can_id", "can0"), end_type);
   // RCLCPP_INFO(this->get_logger(), "arm_control_type = %s",arm_control_type.c_str());
   interfaces_ptr_->arx_x(500, 2000, 10);
+  interfaces_ptr_->setHomePositions(go_home_positions_);
   auto pub_name = this->declare_parameter("arm_pub_topic_name", "arm_status");
 
   if (arm_control_type == "normal") {
@@ -35,7 +40,7 @@ X5Controller::X5Controller() : Node("x5_controller_node") {
         10,
         std::bind(&X5Controller::CmdCallback, this, std::placeholders::_1));
     // 定时器，用于发布关节信息
-    timer_ = this->create_wall_timer(std::chrono::milliseconds(1), std::bind(&X5Controller::PubState, this));
+    timer_ = this->create_wall_timer(std::chrono::milliseconds(10), std::bind(&X5Controller::PubState, this));
   } else if (arm_control_type == "vr_slave") {
     RCLCPP_INFO(this->get_logger(), "vr遥操作模式启动");
     // 创建发布器
@@ -65,6 +70,17 @@ X5Controller::X5Controller() : Node("x5_controller_node") {
     // 定时器，用于发布关节信息
     timer_ = this->create_wall_timer(std::chrono::milliseconds(1), std::bind(&X5Controller::PubState, this));
   }
+  else if (arm_control_type == "joint_control_v1")
+  {
+    RCLCPP_INFO(this->get_logger(),"关节控制模式启动");
+    joint_state_publisher_ = this->create_publisher<arx5_arm_msg::msg::RobotStatus>(pub_name, 10);
+    joint_control_subscriber_ = this->create_subscription<arm_control::msg::JointControl>(
+        this->declare_parameter("arm_sub_topic_name", "joint_control"),
+        10,
+        std::bind(&X5Controller::JointControlCallback,this,std::placeholders::_1));
+    timer_ = this->create_wall_timer(std::chrono::milliseconds(1), std::bind(&X5Controller::PubState, this));
+  }
+  arx_joy_sub_ = this->create_subscription<std_msgs::msg::Int32MultiArray>("/arx_joy",1,std::bind(&X5Controller::arxJoyCB,this,std::placeholders::_1));
 }
 
 void X5Controller::CmdCallback(const arx5_arm_msg::msg::RobotCmd::SharedPtr msg) {
@@ -86,6 +102,13 @@ void X5Controller::CmdCallback(const arx5_arm_msg::msg::RobotCmd::SharedPtr msg)
   interfaces_ptr_->setArmStatus(msg->mode);
 
   interfaces_ptr_->setCatch(msg->gripper);
+}
+
+void X5Controller::arxJoyCB(const std_msgs::msg::Int32MultiArray::SharedPtr msg) {
+  if (msg->data[0] == 1)
+    interfaces_ptr_->setArmStatus(InterfacesThread::state::G_COMPENSATION);
+  if (msg->data[1] == 1)
+    interfaces_ptr_->setArmStatus(InterfacesThread::state::GO_HOME);
 }
 
 void X5Controller::PubState() {
@@ -111,12 +134,12 @@ void X5Controller::PubState() {
   message.end_pos = result;
 
   std::vector<double> joint_pos_vector = interfaces_ptr_->getJointPositons();
-  for (int i = 0; i <= 7; i++) {
+  for (int i = 0; i < 7; i++) {
     message.joint_pos[i] = joint_pos_vector[i];
   }
 
   std::vector<double> joint_velocities_vector = interfaces_ptr_->getJointVelocities();
-  for (int i = 0; i <= 7; i++) {
+  for (int i = 0; i < 7; i++) {
     message.joint_vel[i] = joint_velocities_vector[i];
   }
 
@@ -192,11 +215,11 @@ void X5Controller::VrPubState() {
 
   msg.end_pos = result;
 
-  for (int i = 0; i <= 7; i++) {
+  for (int i = 0; i < 7; i++) {
     msg.joint_pos[i] = joint_pos_vector[i];
   }
 
-  for (int i = 0; i <= 7; i++) {
+  for (int i = 0; i < 7; i++) {
     msg.joint_vel[i] = joint_velocities_vector[i];
   }
 
@@ -217,10 +240,26 @@ void X5Controller::FollowCmdCallback(const arx5_arm_msg::msg::RobotStatus::Share
   interfaces_ptr_->setJointPositions(target_joint_position);
   interfaces_ptr_->setArmStatus(InterfacesThread::state::POSITION_CONTROL);
 
-  if (catch_control_mode_ == CatchControlMode::kPosition)
-    interfaces_ptr_->setCatch(msg->joint_pos[6] * 5);
+  if (catch_control_mode_ == CatchControlMode::kPosition) {
+    double pos;
+    if(new_version_)
+      pos = msg->joint_pos[6];
+    else
+      pos = msg->joint_pos[6] * 5;
+    interfaces_ptr_->setCatch(pos);
+  }
   else
     interfaces_ptr_->setCatchTorque(msg->joint_cur[6]);
+}
+
+void X5Controller::JointControlCallback(const arm_control::msg::JointControl::SharedPtr msg) {
+  std::vector<double> target_joint_position(6,0.0);
+  for (int i = 0; i < 6; i++)
+    target_joint_position[i] = msg->joint_pos[i];
+  interfaces_ptr_->setJointPositions(target_joint_position);
+  interfaces_ptr_->setArmStatus(InterfacesThread::state::POSITION_CONTROL);
+
+  interfaces_ptr_->setCatch(msg->joint_pos[6]);
 }
 }
 

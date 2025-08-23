@@ -87,8 +87,10 @@ class SingleArm:
         type = config.get("type",0)
         if(type == 0):
             urdf_path = os.path.join(current_dir,"x5.urdf")
-        else:
+        elif(type == 1):
             urdf_path = os.path.join(current_dir,"x5_master.urdf")
+        else:
+            urdf_path = os.path.join(current_dir,"x5_2025.urdf")
         self.arm = arx.InterfacesPy(urdf_path,config.get("can_port", "can0"),type)
         self.arm.arx_x(500,2000,10)
 

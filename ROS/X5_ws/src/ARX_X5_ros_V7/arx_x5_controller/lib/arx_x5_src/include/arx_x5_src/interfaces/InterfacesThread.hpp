@@ -34,6 +34,8 @@ namespace arx::x5
 
         void setJointPositions(std::vector<double> positions);
 
+        void setHomePositions(std::vector<double> positions);
+
         void setCatch(double position);
 
         void setCatchTorque(double torque);
