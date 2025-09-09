@@ -5,7 +5,6 @@
     arm_pub_topic_name: arm_slave_l_status
     arm_sub_topic_name: arm_master_l_status
     arm_end_type: 2
-    go_home_position: [ 0.0,0.948,0.858,-0.573,0.0,0.0 ]
     
 /arm_slave_r:
   ros__parameters:
@@ -14,4 +13,3 @@
     arm_pub_topic_name: arm_slave_r_status
     arm_sub_topic_name: arm_master_r_status
     arm_end_type: 2
-    go_home_position: [ 0.0,0.948,0.858,-0.573,0.0,0.0 ]
