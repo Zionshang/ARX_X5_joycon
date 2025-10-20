@@ -304,9 +304,9 @@ class JoyconRobotics:
         joycon_button_gripper_open = self.joycon.get_button_a() if self.joycon.is_right() else self.joycon.get_button_right()
         joycon_button_gripper_close = self.joycon.get_button_y() if self.joycon.is_right() else self.joycon.get_button_left()
         if joycon_button_gripper_open == 1:
-            self.gripper_state +=  0.001 * self.gripper_speed
+            self.gripper_state +=  0.01 * self.gripper_speed
         if joycon_button_gripper_close == 1:
-            self.gripper_state -=  0.001 * self.gripper_speed
+            self.gripper_state -=  0.01 * self.gripper_speed
         
         self.check_limits_gripper()
         return self.gripper_state

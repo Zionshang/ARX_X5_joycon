@@ -10,7 +10,6 @@ if JOY_ROOT not in sys.path:
     sys.path.append(JOY_ROOT)
 
 from joycon.joyconrobotics import JoyconRobotics
-from joycon.visualizer import PoseVisualizer
 
 arm_config: Dict[str, Any] = {
     "can_port": "can0",
@@ -29,14 +28,8 @@ def run_joycon_control():
         offset_position_m=[0, 0, 0],
         limit_dof=True,
         glimit=[[0.0, -0.5, -0.5, -1.3, -1.3, -1.3], [0.5, 0.5, 0.5, 1.3, 1.3, 1.3]],
-        gripper_limit=[0.0, 0.8],
-    )
-
-    viz = PoseVisualizer(
-        axis_len=0.3,
-        world_axis_len=0.2,
-        window_title="Joycon Pose",
-        orientation_format="euler",
+        gripper_limit=[0.0, 5.2],
+        gripper_speed=5.0,
     )
 
     while True:
@@ -52,12 +45,11 @@ def run_joycon_control():
         # 发送夹爪
         single_arm.set_catch_pos(pos=float(gripper))
 
-        viz.update(pose)
+        print(f"GRIPPER: {gripper:.3f}")
+        # viz.update(pose)
         time.sleep(0.01)
 
     joy.disconnect()
-    viz.close()
-
 
 if __name__ == "__main__":
     run_joycon_control()
