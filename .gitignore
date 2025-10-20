@@ -6,3 +6,5 @@
 ROS/R5Pro_ws/src/CMakeLists.txt
 arx_x5_python/bimanual/api
 **__pycache__/
+.vscode
+*.egg-info/
